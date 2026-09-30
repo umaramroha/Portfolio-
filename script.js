@@ -1,120 +1,98 @@
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // 1. Mobile Menu Toggle
+    const body = document.body;
+    const navbar = document.getElementById('navbar');
+    const progress = document.getElementById('scrollProgress');
+    const backToTop = document.getElementById('backToTop');
     const menuToggle = document.getElementById('menuToggle');
     const menuClose = document.getElementById('menuClose');
     const mobileMenu = document.getElementById('mobileMenu');
     const mobileLinks = document.querySelectorAll('.mobile-nav-links a');
+    const navLinks = document.querySelectorAll('.nav-links a');
+    const sections = document.querySelectorAll('main section[id]');
+    const parallaxItems = document.querySelectorAll('[data-parallax]');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    menuToggle.addEventListener('click', () => mobileMenu.classList.add('open'));
-    menuClose.addEventListener('click', () => mobileMenu.classList.remove('open'));
-    mobileLinks.forEach(link => link.addEventListener('click', () => mobileMenu.classList.remove('open')));
-
-    // 2. Scroll Progress Bar
-    const scrollProgress = document.getElementById('scrollProgress');
-    window.addEventListener('scroll', () => {
+    const updateScrollUI = () => {
         const scrollTop = window.scrollY;
-        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPercent = (scrollTop / docHeight) * 100;
-        scrollProgress.style.width = scrollPercent + '%';
-    });
+        const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+        progress.style.width = `${scrollable > 0 ? (scrollTop / scrollable) * 100 : 0}%`;
+        navbar.classList.toggle('scrolled', scrollTop > 30);
+        backToTop.classList.toggle('visible', scrollTop > 700);
 
-    // 3. Reveal on Scroll Animation
-    const revealElements = document.querySelectorAll('.reveal');
-    const revealObserver = new IntersectionObserver((entries) => {
+        let current = '';
+        sections.forEach(section => {
+            if (scrollTop >= section.offsetTop - 150) current = section.id;
+        });
+        navLinks.forEach(link => link.classList.toggle('active', link.getAttribute('href') === `#${current}`));
+
+        if (!reducedMotion) {
+            const y = scrollTop * 0.12;
+            document.querySelector('.orb-a')?.style.setProperty('--parallax-y', `${y}px`);
+            document.querySelector('.orb-b')?.style.setProperty('--parallax-y', `${-y * .7}px`);
+            document.querySelector('.orb-c')?.style.setProperty('--parallax-y', `${y * .45}px`);
+        }
+    };
+
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+        if (!ticking) {
+            requestAnimationFrame(() => { updateScrollUI(); ticking = false; });
+            ticking = true;
+        }
+    }, { passive: true });
+    updateScrollUI();
+
+    const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('visible');
+                observer.unobserve(entry.target);
             }
         });
-    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+    }, { threshold: .12, rootMargin: '0px 0px -45px' });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
-    revealElements.forEach(el => revealObserver.observe(el));
-
-    // 4. Stat Counter Animation
-    const statNumbers = document.querySelectorAll('.stat-number');
-    const statObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const el = entry.target;
-                const target = parseInt(el.getAttribute('data-target'));
-                const duration = 2000;
-                const start = performance.now();
-
-                const animate = (now) => {
-                    const elapsed = now - start;
-                    const progress = Math.min(elapsed / duration, 1);
-                    const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
-                    const current = Math.floor(eased * target);
-                    el.textContent = current + '+';
-                    if (progress < 1) requestAnimationFrame(animate);
-                };
-                requestAnimationFrame(animate);
-                statObserver.unobserve(el);
-            }
-        });
-    }, { threshold: 0.5 });
-
-    statNumbers.forEach(el => statObserver.observe(el));
-
-    // 5. Active Nav Link Highlighting
-    const sections = document.querySelectorAll('section[id]');
-    const navLinks = document.querySelectorAll('.nav-links a');
-
-    window.addEventListener('scroll', () => {
-        let current = '';
-        sections.forEach(section => {
-            const sectionTop = section.offsetTop - 100;
-            if (window.scrollY >= sectionTop) {
-                current = section.getAttribute('id');
-            }
-        });
-
-        navLinks.forEach(link => {
-            link.classList.remove('active');
-            if (link.getAttribute('href') === '#' + current) {
-                link.classList.add('active');
-            }
-        });
+    const closeMenu = () => {
+        mobileMenu.classList.remove('open');
+        mobileMenu.setAttribute('aria-hidden', 'true');
+        menuToggle.setAttribute('aria-expanded', 'false');
+        body.classList.remove('menu-open');
+    };
+    menuToggle.addEventListener('click', () => {
+        mobileMenu.classList.add('open');
+        mobileMenu.setAttribute('aria-hidden', 'false');
+        menuToggle.setAttribute('aria-expanded', 'true');
+        body.classList.add('menu-open');
     });
+    menuClose.addEventListener('click', closeMenu);
+    mobileLinks.forEach(link => link.addEventListener('click', closeMenu));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 
-    // 6. Back to Top Button
-    const backToTop = document.getElementById('backToTop');
-    window.addEventListener('scroll', () => {
-        if (window.scrollY > 600) {
-            backToTop.classList.add('visible');
-        } else {
-            backToTop.classList.remove('visible');
-        }
-    });
-    backToTop.addEventListener('click', () => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-
-    // 7. Form Submission Handling
-    const contactForm = document.getElementById('contactForm');
-    const formSuccess = document.getElementById('formSuccess');
-
-    if (contactForm) {
-        contactForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const btn = contactForm.querySelector('button[type="submit"]');
-            const originalText = btn.innerHTML;
-            
-            btn.innerHTML = 'Sending... <i class="fas fa-spinner fa-spin"></i>';
-            btn.disabled = true;
-
-            // Simulate API call
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-                formSuccess.classList.remove('hidden');
-                contactForm.reset();
-                
-                setTimeout(() => {
-                    formSuccess.classList.add('hidden');
-                }, 4000);
-            }, 1500);
-        });
+    if (!reducedMotion) {
+        window.addEventListener('scroll', () => {
+            parallaxItems.forEach(item => {
+                const speed = Number(item.dataset.parallax || 0);
+                const rect = item.getBoundingClientRect();
+                const offset = (window.innerHeight / 2 - (rect.top + rect.height / 2)) * speed;
+                item.style.transform = `translate3d(0, ${offset}px, 0)`;
+            });
+        }, { passive: true });
     }
+
+    backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' }));
+
+    const contactForm = document.getElementById('contactForm');
+    const formStatus = document.getElementById('formStatus');
+    contactForm?.addEventListener('submit', e => {
+        e.preventDefault();
+        const data = new FormData(contactForm);
+        const name = String(data.get('name') || '').trim();
+        const email = String(data.get('email') || '').trim();
+        const subject = String(data.get('subject') || 'Job Opportunity').trim();
+        const message = String(data.get('message') || '').trim();
+        const bodyText = `Name: ${name}\nEmail: ${email}\n\n${message}`;
+        const mailto = `mailto:umarimam39@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
+        formStatus.textContent = 'Opening your email app…';
+        window.location.href = mailto;
+    });
 });
